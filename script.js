@@ -147,691 +147,241 @@ Portanto, o Governo Federal deve ampliar os pontos de coleta de resíduos eletr�
 ];
 
 /* FIM DA PARTE 2 DE 3 */
-
-/* ==========================================
-   GUILHERME TAVARES | LEGACY 2026
-   PARTE 3 DE 3 — FUNCIONALIDADES
-========================================== */
-
-/* ==========================================
-   SALVAMENTO LOCAL DAS REDAÇÕES
-========================================== */
+/* LEGACY 2026 — PARTE 3 CORRIGIDA */
 
 const STORAGE_KEY = "guilherme_legacy_redacoes";
+let redacaoAtual = null;
 
 function carregarRedacoes() {
   try {
-    const salvas = JSON.parse(
-      localStorage.getItem(STORAGE_KEY)
-    );
-
+    const salvas = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     if (!Array.isArray(salvas)) return;
 
     salvas.forEach(item => {
-      if (!item || item.editada !== true) return;
-
-      const original = redacoes.find(
-        r => r.id === item.id
-      );
-
-      if (original) {
-        original.titulo = item.titulo;
-        original.texto = item.texto;
-        original.editada = true;
+      const redacao = redacoes.find(r => r.id === item.id);
+      if (redacao && item.editada === true) {
+        redacao.titulo = item.titulo;
+        redacao.texto = item.texto;
       }
     });
   } catch (erro) {
-    console.warn(
-      "Erro ao carregar redações:",
-      erro
-    );
+    console.warn("Erro ao carregar redações", erro);
   }
 }
 
-function salvarRedacoes() {
+function salvarRedacaoLocal(redacao) {
   try {
-    const editadas = redacoes.filter(
-      r => r.editada === true
-    );
+    const salvas = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const lista = Array.isArray(salvas) ? salvas : [];
+    const outras = lista.filter(r => r.id !== redacao.id);
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(editadas)
-    );
+    outras.push({
+      id: redacao.id,
+      titulo: redacao.titulo,
+      texto: redacao.texto,
+      editada: true
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(outras));
+    return true;
   } catch (erro) {
-    console.warn(
-      "Erro ao salvar redações:",
-      erro
-    );
+    console.error(erro);
+    return false;
   }
 }
-
-/* ==========================================
-   CRIAR ELEMENTOS HTML
-========================================== */
-
-function criarElemento(tag, classe = "", texto) {
-  const elemento = document.createElement(tag);
-
-  if (classe) {
-    elemento.className = classe;
-  }
-
-  if (texto !== undefined) {
-    elemento.textContent = texto;
-  }
-
-  return elemento;
-}
-
-/* ==========================================
-   LINHA DO TEMPO DAS ESCOLAS
-========================================== */
-
-function renderizarEscolas() {
-  const container = document.querySelector(
-    "#timeline, #escolas, [data-escolas]"
-  );
-
-  if (!container) {
-    console.warn(
-      "Container da linha do tempo não encontrado."
-    );
-    return;
-  }
-
-  container.innerHTML = "";
-
-  escolas.forEach((escola, indice) => {
-    const card = criarElemento(
-      "article",
-      "timeline-item reveal"
-    );
-
-    const numero = criarElemento(
-      "span",
-      "timeline-number",
-      String(indice + 1).padStart(2, "0")
-    );
-
-    const conteudo = criarElemento(
-      "div",
-      "timeline-content"
-    );
-
-    const fase = criarElemento(
-      "span",
-      "timeline-phase",
-      escola.fase
-    );
-
-    const titulo = criarElemento(
-      "h3",
-      "",
-      escola.nome
-    );
-
-    const historia = criarElemento(
-      "p",
-      "",
-      escola.historia
-    );
-
-    conteudo.append(
-      fase,
-      titulo,
-      historia
-    );
-
-    card.append(
-      numero,
-      conteudo
-    );
-
-    container.appendChild(card);
-  });
-
-  observarAnimacoes();
-}
-
-/* ==========================================
-   CARTÕES DAS REDAÇÕES
-========================================== */
 
 function renderizarRedacoes(filtro = "") {
-  const container = document.querySelector(
-    "#redacoes-grid, #redacoesGrid, [data-redacoes]"
+  const grid = document.getElementById("essayGrid");
+  const contador = document.getElementById("essayCount");
+  if (!grid) return;
+
+  grid.innerHTML = "";
+
+  const termo = filtro.toLocaleLowerCase("pt-BR").trim();
+
+  const lista = redacoes.filter(r =>
+    (r.titulo + " " + r.texto)
+      .toLocaleLowerCase("pt-BR")
+      .includes(termo)
   );
 
-  if (!container) {
-    console.warn(
-      "Container das redações não encontrado."
-    );
-    return;
+  if (contador) {
+    contador.textContent = `${lista.length} de 12 redações`;
   }
 
-  container.innerHTML = "";
+  lista.forEach(redacao => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "essay-card reveal visible";
 
-  const termo = filtro
-    .toLocaleLowerCase("pt-BR")
-    .trim();
+    const numero = document.createElement("span");
+    numero.className = "essay-num";
+    numero.textContent = `REDAÇÃO ${String(redacao.id).padStart(2, "0")}`;
 
-  const filtradas = redacoes.filter(redacao => {
-    const conteudo = (
-      redacao.titulo + " " + redacao.texto
-    ).toLocaleLowerCase("pt-BR");
+    const titulo = document.createElement("h3");
+    titulo.textContent = redacao.titulo;
 
-    return conteudo.includes(termo);
+    const resumo = document.createElement("p");
+    resumo.textContent = redacao.texto
+      ? redacao.texto.slice(0, 145) + "..."
+      : "Espaço reservado para uma nova redação.";
+
+    const abrir = document.createElement("span");
+    abrir.className = "essay-open";
+    abrir.textContent = redacao.texto
+      ? "LER REDAÇÃO ↗"
+      : "ADICIONAR REDAÇÃO +";
+
+    card.append(numero, titulo, resumo, abrir);
+    card.addEventListener("click", () => abrirRedacao(redacao.id));
+    grid.appendChild(card);
   });
-
-  if (filtradas.length === 0) {
-    const aviso = criarElemento(
-      "p",
-      "empty-state",
-      "Nenhuma redação encontrada."
-    );
-
-    container.appendChild(aviso);
-    return;
-  }
-
-  filtradas.forEach(redacao => {
-    const card = criarElemento(
-      "article",
-      "redacao-card reveal"
-    );
-
-    const numero = criarElemento(
-      "span",
-      "redacao-number",
-      String(redacao.id).padStart(2, "0")
-    );
-
-    const titulo = criarElemento(
-      "h3",
-      "",
-      redacao.titulo
-    );
-
-    const resumoTexto = redacao.texto
-      ? redacao.texto.slice(0, 130) +
-        (redacao.texto.length > 130 ? "..." : "")
-      : "Este espaço está reservado para uma nova redação.";
-
-    const resumo = criarElemento(
-      "p",
-      "",
-      resumoTexto
-    );
-
-    const botao = criarElemento(
-      "button",
-      "redacao-button",
-      redacao.texto
-        ? "Ler redação"
-        : "Adicionar redação"
-    );
-
-    botao.type = "button";
-
-    botao.addEventListener("click", () => {
-      abrirRedacao(redacao.id);
-    });
-
-    card.append(
-      numero,
-      titulo,
-      resumo,
-      botao
-    );
-
-    container.appendChild(card);
-  });
-
-  observarAnimacoes();
 }
-
-/* ==========================================
-   CRIAR JANELA DAS REDAÇÕES
-========================================== */
-
-function obterModal() {
-  let modal = document.querySelector(
-    "#legacy-modal"
-  );
-
-  if (!modal) {
-    modal = criarElemento(
-      "div",
-      "legacy-modal"
-    );
-
-    modal.id = "legacy-modal";
-
-    modal.setAttribute(
-      "role",
-      "dialog"
-    );
-
-    modal.setAttribute(
-      "aria-modal",
-      "true"
-    );
-
-    document.body.appendChild(modal);
-  }
-
-  return modal;
-}
-
-/* ==========================================
-   ABRIR REDAÇÃO COMPLETA
-========================================== */
 
 function abrirRedacao(id) {
-  const redacao = redacoes.find(
-    r => r.id === Number(id)
-  );
+  const redacao = redacoes.find(r => r.id === id);
+  const dialog = document.getElementById("essayDialog");
 
+  if (!redacao || !dialog) return;
+
+  redacaoAtual = id;
+
+  document.getElementById("dialogNumber").textContent =
+    `REDAÇÃO ${String(id).padStart(2, "0")}`;
+
+  document.getElementById("essayTitle").value = redacao.titulo;
+  document.getElementById("essayText").value = redacao.texto;
+  document.getElementById("saveStatus").textContent = "";
+
+  if (!dialog.open) dialog.showModal();
+}
+
+function fecharRedacao() {
+  const dialog = document.getElementById("essayDialog");
+  if (dialog && dialog.open) dialog.close();
+}
+
+function salvarRedacao() {
+  const redacao = redacoes.find(r => r.id === redacaoAtual);
   if (!redacao) return;
 
-  const modal = obterModal();
+  const titulo = document.getElementById("essayTitle").value.trim();
+  const texto = document.getElementById("essayText").value;
 
-  modal.innerHTML = "";
-
-  const painel = criarElemento(
-    "div",
-    "legacy-modal-content"
-  );
-
-  const fechar = criarElemento(
-    "button",
-    "modal-close",
-    "×"
-  );
-
-  fechar.type = "button";
-
-  fechar.setAttribute(
-    "aria-label",
-    "Fechar janela"
-  );
-
-  fechar.addEventListener(
-    "click",
-    fecharModal
-  );
-
-  const titulo = criarElemento(
-    "h2",
-    "",
-    redacao.titulo
-  );
-
-  const texto = criarElemento(
-    "div",
-    "modal-text",
-    redacao.texto ||
-      "Esta redação ainda não foi adicionada."
-  );
-
-  // Preserva os parágrafos originais.
-  texto.style.whiteSpace = "pre-line";
-
-  const editar = criarElemento(
-    "button",
-    "redacao-button",
-    redacao.texto
-      ? "Editar redação"
-      : "Adicionar redação"
-  );
-
-  editar.type = "button";
-
-  editar.addEventListener("click", () => {
-    editarRedacao(id);
-  });
-
-  painel.append(
-    fechar,
-    titulo,
-    texto,
-    editar
-  );
-
-  modal.appendChild(painel);
-
-  modal.classList.add("active");
-
-  document.body.style.overflow = "hidden";
-}
-
-/* ==========================================
-   EDITAR OU ADICIONAR REDAÇÃO
-========================================== */
-
-function editarRedacao(id) {
-  const redacao = redacoes.find(
-    r => r.id === Number(id)
-  );
-
-  if (!redacao) return;
-
-  const modal = obterModal();
-
-  modal.innerHTML = "";
-
-  const painel = criarElemento(
-    "div",
-    "legacy-modal-content"
-  );
-
-  const fechar = criarElemento(
-    "button",
-    "modal-close",
-    "×"
-  );
-
-  fechar.type = "button";
-
-  fechar.addEventListener(
-    "click",
-    fecharModal
-  );
-
-  const titulo = criarElemento(
-    "h2",
-    "",
-    "Editar redação"
-  );
-
-  const campoTitulo = criarElemento(
-    "input",
-    "redacao-input"
-  );
-
-  campoTitulo.type = "text";
-  campoTitulo.value = redacao.titulo;
-  campoTitulo.placeholder =
-    "Digite o título da redação";
-
-  const campoTexto = criarElemento(
-    "textarea",
-    "redacao-textarea"
-  );
-
-  campoTexto.value = redacao.texto;
-  campoTexto.placeholder =
-    "Escreva sua redação completa aqui...";
-  campoTexto.rows = 14;
-
-  const salvar = criarElemento(
-    "button",
-    "redacao-button",
-    "Salvar redação"
-  );
-
-  salvar.type = "button";
-
-  salvar.addEventListener("click", () => {
-    redacao.titulo =
-      campoTitulo.value.trim() ||
-      redacao.titulo;
-
-    redacao.texto = campoTexto.value;
-
-    redacao.editada = true;
-
-    salvarRedacoes();
-
-    const pesquisa = document.querySelector(
-      "#pesquisa, #searchInput, #search, [data-pesquisa]"
-    );
-
-    renderizarRedacoes(
-      pesquisa ? pesquisa.value : ""
-    );
-
-    abrirRedacao(id);
-  });
-
-  painel.append(
-    fechar,
-    titulo,
-    campoTitulo,
-    campoTexto,
-    salvar
-  );
-
-  modal.appendChild(painel);
-
-  modal.classList.add("active");
-
-  document.body.style.overflow = "hidden";
-}
-
-/* ==========================================
-   FECHAR JANELA
-========================================== */
-
-function fecharModal() {
-  const modal = document.querySelector(
-    "#legacy-modal"
-  );
-
-  if (modal) {
-    modal.classList.remove("active");
-  }
-
-  document.body.style.overflow = "";
-}
-
-/* ==========================================
-   ANIMAÇÕES AO ROLAR A PÁGINA
-========================================== */
-
-let observer;
-
-function observarAnimacoes() {
-  const elementos = document.querySelectorAll(
-    ".reveal"
-  );
-
-  if (!("IntersectionObserver" in window)) {
-    elementos.forEach(elemento => {
-      elemento.classList.add("visible");
-    });
-
+  if (!titulo) {
+    document.getElementById("saveStatus").textContent =
+      "Digite um título para a redação.";
     return;
   }
 
-  if (!observer) {
-    observer = new IntersectionObserver(
-      entradas => {
-        entradas.forEach(entrada => {
-          if (entrada.isIntersecting) {
-            entrada.target.classList.add(
-              "visible"
-            );
+  const anterior = {
+    titulo: redacao.titulo,
+    texto: redacao.texto
+  };
 
-            observer.unobserve(
-              entrada.target
-            );
-          }
-        });
-      },
-      {
-        threshold: 0.1
-      }
-    );
+  redacao.titulo = titulo;
+  redacao.texto = texto;
+
+  if (!salvarRedacaoLocal(redacao)) {
+    redacao.titulo = anterior.titulo;
+    redacao.texto = anterior.texto;
+    document.getElementById("saveStatus").textContent =
+      "Não foi possível salvar neste navegador.";
+    return;
   }
 
-  elementos.forEach(elemento => {
-    if (!elemento.classList.contains("visible")) {
-      observer.observe(elemento);
-    }
-  });
+  const pesquisa = document.getElementById("search");
+  renderizarRedacoes(pesquisa ? pesquisa.value : "");
+  fecharRedacao();
 }
-
-/* ==========================================
-   PESQUISA DE REDAÇÕES
-========================================== */
-
-function configurarPesquisa() {
-  const pesquisa = document.querySelector(
-    "#pesquisa, #searchInput, #search, [data-pesquisa]"
-  );
-
-  if (!pesquisa) return;
-
-  pesquisa.addEventListener(
-    "input",
-    () => {
-      renderizarRedacoes(
-        pesquisa.value
-      );
-    }
-  );
-}
-
-/* ==========================================
-   MENU RESPONSIVO
-========================================== */
 
 function configurarMenu() {
-  const botao = document.querySelector(
-    "#menu-toggle, .menu-toggle, [data-menu-toggle]"
-  );
+  const botao = document.getElementById("menuToggle");
+  const nav = document.getElementById("nav");
 
-  const menu = document.querySelector(
-    "#nav-menu, .nav-links, [data-nav-menu]"
-  );
+  if (!botao || !nav) return;
 
-  if (!botao || !menu) return;
+  botao.addEventListener("click", () => {
+    const aberto = nav.classList.toggle("open");
+    botao.setAttribute("aria-expanded", String(aberto));
+  });
 
-  botao.addEventListener(
-    "click",
-    () => {
-      const aberto = menu.classList.toggle(
-        "active"
-      );
-
-      botao.setAttribute(
-        "aria-expanded",
-        String(aberto)
-      );
-    }
-  );
-
-  menu.querySelectorAll("a").forEach(link => {
+  nav.querySelectorAll("a").forEach(link => {
     link.addEventListener("click", () => {
-      menu.classList.remove("active");
-
-      botao.setAttribute(
-        "aria-expanded",
-        "false"
-      );
+      nav.classList.remove("open");
+      botao.setAttribute("aria-expanded", "false");
     });
   });
 }
 
-/* ==========================================
-   ROLAGEM SUAVE
-========================================== */
+function configurarAnimacoes() {
+  const elementos = document.querySelectorAll(".reveal");
 
-function configurarRolagem() {
-  document
-    .querySelectorAll('a[href^="#"]')
-    .forEach(link => {
-      link.addEventListener(
-        "click",
-        evento => {
-          const seletor = link.getAttribute(
-            "href"
-          );
+  if (!("IntersectionObserver" in window)) {
+    elementos.forEach(el => el.classList.add("visible"));
+    return;
+  }
 
-          if (!seletor || seletor === "#") {
-            return;
-          }
-
-          const destino = document.getElementById(
-            seletor.slice(1)
-          );
-
-          if (destino) {
-            evento.preventDefault();
-
-            destino.scrollIntoView({
-              behavior: "smooth",
-              block: "start"
-            });
-          }
-        }
-      );
+  const observer = new IntersectionObserver(entradas => {
+    entradas.forEach(entrada => {
+      if (entrada.isIntersecting) {
+        entrada.target.classList.add("visible");
+        observer.unobserve(entrada.target);
+      }
     });
+  }, { threshold: 0.08 });
+
+  elementos.forEach(el => observer.observe(el));
 }
 
-/* ==========================================
-   FECHAR COM ESC OU CLICANDO FORA
-========================================== */
+function configurarProgresso() {
+  const barra = document.getElementById("progress");
+  if (!barra) return;
 
-document.addEventListener(
-  "keydown",
-  evento => {
-    if (evento.key === "Escape") {
-      fecharModal();
-    }
+  function atualizar() {
+    const maximo =
+      document.documentElement.scrollHeight - window.innerHeight;
+
+    const progresso = maximo > 0
+      ? (window.scrollY / maximo) * 100
+      : 0;
+
+    barra.style.width = `${progresso}%`;
   }
-);
 
-document.addEventListener(
-  "click",
-  evento => {
-    if (evento.target?.id === "legacy-modal") {
-      fecharModal();
-    }
-  }
-);
-
-/* ==========================================
-   INICIALIZAÇÃO DO SITE
-========================================== */
+  window.addEventListener("scroll", atualizar, { passive: true });
+  atualizar();
+}
 
 function iniciarSite() {
   carregarRedacoes();
-
-  renderizarEscolas();
-
   renderizarRedacoes();
 
-  configurarPesquisa();
+  const pesquisa = document.getElementById("search");
+  if (pesquisa) {
+    pesquisa.addEventListener("input", () => {
+      renderizarRedacoes(pesquisa.value);
+    });
+  }
+
+  document.getElementById("closeDialog")
+    ?.addEventListener("click", fecharRedacao);
+
+  document.getElementById("cancelDialog")
+    ?.addEventListener("click", fecharRedacao);
+
+  document.getElementById("saveEssay")
+    ?.addEventListener("click", salvarRedacao);
 
   configurarMenu();
+  configurarAnimacoes();
+  configurarProgresso();
 
-  configurarRolagem();
-
-  observarAnimacoes();
-
-  console.log(
-    "Guilherme Tavares | LEGACY 2026"
-  );
-
-  console.log(
-    "6 escolas e 12 espaços para redações."
-  );
+  console.log("LEGACY 2026 funcionando!");
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener(
-    "DOMContentLoaded",
-    iniciarSite
-  );
+  document.addEventListener("DOMContentLoaded", iniciarSite);
 } else {
   iniciarSite();
 }
-
-/* ==========================================
-   FIM DO JAVASCRIPT
-   GUILHERME TAVARES | LEGACY 2026
-========================================== */
-
